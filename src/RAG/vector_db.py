@@ -22,7 +22,7 @@ import gc
 import psutil
 
 class LawVectorDB:
-    def __init__(self, vectordb_path : str = "data/Database/LawDB", vectordb_name : str = "laws"):
+    def __init__(self, vectordb_path : str = "database/LawDB", vectordb_name : str = "laws"):
         self.vectordb_path = vectordb_path
         if not os.path.exists(self.vectordb_path):
             os.makedirs(self.vectordb_path)

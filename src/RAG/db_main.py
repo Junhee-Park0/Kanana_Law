@@ -38,7 +38,7 @@ def create_vectordb():
     VectorDB 생성하기
     """
     # 0. 기존 VectorDB 완전 삭제
-    vectordb_path = "data/Database/LawDB"
+    vectordb_path = Path("database/LawDB")
     
     if vectordb_path.exists():
         print("기존 VectorDB 삭제 중...")
@@ -74,7 +74,7 @@ def create_vectordb():
         # 3. 벡터 DB 삭제 후 생성
         print("=== Vector DB 업데이트 중 ===")
         vectordb_start_time = time.time()
-        vector_db_path = "data/Database/LawDB"
+        vector_db_path = "database/LawDB"
         
         if os.path.exists(vector_db_path):
             shutil.rmtree(vector_db_path)

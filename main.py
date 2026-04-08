@@ -9,8 +9,9 @@ from dotenv import load_dotenv
 load_dotenv(".env")
 
 # Config 및 Logger import
-from utils.config import Config
-from utils.logger import logger, log_agent_action, setup_logger
+from config import Config
+import utils.logger as app_logger
+from utils.logger import log_agent_action
 
 from src.Agent_Kanana.tools_kanana import (extend_query, parse_document_ocr, check_query_answerable, extract_issues, 
                     search_rag, check_enough_context, generate_search_queries, search_web, 
@@ -111,7 +112,6 @@ def legal_agent_main():
     print("=" * 60)
     print("🔧 환경 설정:")
     
-    global logger 
     enable_local_logging = input("로컬 로깅을 활성화하시겠습니까? (Y/N): ").strip().lower()
     if enable_local_logging == 'y':
         Config.ENABLE_LOCAL_LOGGING = True
@@ -119,7 +119,7 @@ def legal_agent_main():
         Config.ENABLE_LOCAL_LOGGING = False
     
     # 로컬 로깅 설정에 따라 logger 재설정
-    logger = setup_logger()
+    app_logger.setup_logger()
     
     print("\n📋 현재 설정:")
     config_summary = Config.get_config_summary()
@@ -131,7 +131,7 @@ def legal_agent_main():
         now_str = __import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')
         log_filename = f"logs/law_agent_{now_str}.log"
         print(f"📝 로컬 로그: {log_filename}")
-        logger.info(f"로컬 로깅 활성화: {now_str}")
+        app_logger.logger.info(f"로컬 로깅 활성화: {now_str}")
     else:
         print("📝 로컬 로그: 비활성화")
         log_filename = None
@@ -215,16 +215,16 @@ def legal_agent_main():
                 print(f"❌ 오류가 발생했습니다: {error_message}")
                 print("=" * 60)
                 if Config.ENABLE_LOCAL_LOGGING:
-                    logger.error(f"워크플로우 오류: {error_message}")
+                    app_logger.logger.error(f"워크플로우 오류: {error_message}")
                 continue  # 다음 질문으로 계속
             
             if result.get("answer"):
                 answer = result.get("answer").answer
                 if Config.ENABLE_LOCAL_LOGGING:
-                    logger.info("\n" + "=" * 30)
-                    logger.info("[최종 답변]")
-                    logger.info(f"\n{answer}")
-                    logger.info("\n" + "=" * 30)
+                    app_logger.logger.info("\n" + "=" * 30)
+                    app_logger.logger.info("[최종 답변]")
+                    app_logger.logger.info(f"\n{answer}")
+                    app_logger.logger.info("\n" + "=" * 30)
                 print("\n" + "=" * 60)
                 print("🔎 최종 답변")
                 print("=" * 60)

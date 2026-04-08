@@ -1,3 +1,5 @@
+import json
+import re
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline as hf_pipeline
 from typing import Any, Optional
@@ -6,8 +8,7 @@ import sys
 import time
 
 # Config 및 Logger 추가
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-from utils.config import Config
+from config import Config
 from utils.logger import logger, log_agent_action
 
 _pipeline = None
@@ -187,12 +188,30 @@ def _extract_first_json(text: str) -> str:
     return text[start:].strip()
 
 
+def _extract_json_candidate(text: str) -> str:
+    """코드블록 JSON을 우선 추출하고, 없으면 첫 JSON 객체를 추출."""
+    codeblock_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.DOTALL | re.IGNORECASE)
+    if codeblock_match:
+        return codeblock_match.group(1).strip()
+    return _extract_first_json(text)
+
+
+def _repair_common_json_issues(raw_text: str) -> str:
+    """
+    LLM 출력에서 자주 발생하는 JSON 오류를 최소한으로 보정.
+    - smart quote 정규화
+    - trailing comma 제거
+    """
+    repaired = raw_text.strip()
+    repaired = repaired.replace("“", "\"").replace("”", "\"").replace("’", "'")
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+    return repaired
+
+
 def call_kanana_structured(system_prompt: str, user_input: dict, output_schema: type, max_new_tokens: int = 512) -> Any:
     """
     Kanana 모델의 output 형태를 한정(JSON)하여 호출하는 함수
     """
-    import json
-    import re
     from pydantic import ValidationError
 
     schema_description = (
@@ -217,31 +236,44 @@ def call_kanana_structured(system_prompt: str, user_input: dict, output_schema: 
 
     response_text = call_kanana(full_prompt, user_input, max_new_tokens = max_new_tokens)
 
-    # JSON 파싱 및 Pydantic 검증
-    try:
-        # 1) ```json ... ``` 코드블록 안의 JSON 우선 탐색 (greedy 매칭으로 변경하여 내부 }에 의한 조기 종료 방지)
-        codeblock_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", response_text, re.DOTALL | re.IGNORECASE)
-        if codeblock_match:
-            json_str = codeblock_match.group(1).strip()
-        else:
-            # 2) 중괄호 깊이 추적으로 첫 번째 완전한 JSON 객체만 추출
-            json_str = _extract_first_json(response_text)
-
-        # raw_decode: JSON 뒤에 여분의 텍스트가 있어도 첫 번째 유효한 JSON만 파싱
+    def _parse_response(text: str) -> Any:
+        json_candidate = _extract_json_candidate(text)
         decoder = json.JSONDecoder()
-        data, _ = decoder.raw_decode(json_str.strip())
-        result = output_schema(**data)
+        data, _ = decoder.raw_decode(json_candidate.strip())
+        return output_schema(**data)
 
+    # 1) 원본 파싱 -> 2) 일반 보정 후 파싱 -> 3) JSON 재요청 1회
+    try:
+        result = _parse_response(response_text)
         if Config.ENABLE_LOCAL_LOGGING:
-            log_agent_action("Structured Output 파싱 성공", {
-                "schema": output_schema.__name__
-            })
+            log_agent_action("Structured Output 파싱 성공", {"schema": output_schema.__name__})
         return result
+    except (json.JSONDecodeError, ValidationError):
+        pass
 
+    try:
+        repaired_text = _repair_common_json_issues(response_text)
+        result = _parse_response(repaired_text)
+        print(f"⚠️ Structured Output 보정 파싱 성공 [{output_schema.__name__}]")
+        return result
+    except (json.JSONDecodeError, ValidationError):
+        pass
+
+    try:
+        retry_prompt = (
+            full_prompt
+            + "\n[재출력 지시]\n"
+              "- 이전 출력 형식이 잘못되었습니다.\n"
+              "- 설명 없이 JSON 객체 하나만 출력하세요.\n"
+              "- 문자열 내부 개행은 반드시 \\n 로 이스케이프하세요.\n"
+        )
+        retry_text = call_kanana(retry_prompt, user_input, max_new_tokens = max_new_tokens)
+        result = _parse_response(retry_text)
+        print(f"⚠️ Structured Output 재시도 파싱 성공 [{output_schema.__name__}]")
+        return result
     except (json.JSONDecodeError, ValidationError) as e:
         print(f"❌ Structured Output 파싱 실패 [{output_schema.__name__}]: {e}")
-        print(f"원본 응답: {response_text[:300]}")
-        
+        print(f"원본 응답(앞 400자): {response_text[:400]}")
         if Config.ENABLE_LOCAL_LOGGING:
             from utils.logger import log_error
             log_error(e, f"call_kanana_structured - Schema: {output_schema.__name__}")

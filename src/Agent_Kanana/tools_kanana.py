@@ -113,7 +113,7 @@ def extract_issues(extended_query: str, parsed_document: InputDocument) -> Issue
 def search_rag(combined_queries: QueryList, rag_method: str = "naive") -> RAGList:
     """RAG 검색 기능을 수행하는 함수 (질문과 문서 쟁점들을 통합하여 검색)"""
     try:
-        lawdb_path = "data/Database/LawDB"
+        lawdb_path = "database/LawDB"
         client = chromadb.PersistentClient(path = lawdb_path)
         collection = client.get_or_create_collection("laws")
         

@@ -2,7 +2,7 @@ import logging
 import sys
 from datetime import datetime
 from pathlib import Path
-from utils.config import Config
+from config import Config
 
 class RealTimeFileHandler(logging.FileHandler):
     """실시간으로 로그가 기록되도록 하는 핸들러"""
@@ -15,6 +15,8 @@ def setup_logger(name: str = "Legal_Agent"):
     
     # 로거 생성
     logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
     
     if logger.handlers:
         logger.handlers.clear()
@@ -40,6 +42,8 @@ def setup_logger(name: str = "Legal_Agent"):
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
     
+    # 모듈 전역 logger를 최신 핸들러 구성으로 동기화
+    globals()["logger"] = logger
     return logger
 
 # 기본 로거 인스턴스
