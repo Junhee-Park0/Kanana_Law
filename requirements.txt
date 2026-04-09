@@ -26,3 +26,8 @@ kss>=2.0.0                     # Korean sentence splitter
 
 # Web Search
 tavily>=0.1.0                  # Web search API
+
+# FastAPI 서버
+fastapi>=0.111.0               # FastAPI web framework
+uvicorn[standard]>=0.30.0      # ASGI server
+python-multipart>=0.0.9        # multipart/form-data (파일 업로드)
