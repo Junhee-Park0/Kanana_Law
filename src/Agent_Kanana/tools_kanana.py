@@ -99,15 +99,58 @@ def check_query_answerable(extended_query: str) -> QueryAnswerable:
 def extract_issues(extended_query: str, parsed_document: InputDocument) -> IssuesList:
     """파싱된 문서를 받아와서 쟁점을 추출하는 함수 (질문 들어오면 질문 있는 거랑 관련 짓도록 설정)"""
     system_prompt = load_prompt_kanana("extract_issues_prompt")
-    response = call_kanana_structured(
-        system_prompt = system_prompt,
-        user_input = {
-            "extended_query": extended_query, 
-            "parsed_document": parsed_document.document},
-        output_schema = IssuesList,
-        max_new_tokens = 512
-    )
-    return response
+    try:
+        response = call_kanana_structured(
+            system_prompt = system_prompt,
+            user_input = {
+                "query": extended_query,
+                "document": parsed_document.document
+            },
+            output_schema = IssuesList,
+            max_new_tokens = 512
+        )
+        return response
+    except Exception as e:
+        # 모델이 단일 객체({"issue": ...})를 반환하는 경우를 방어적으로 보정
+        print(f"⚠️ IssuesList 파싱 실패, 단일 쟁점 보정 시도: {e}")
+        from src.Agent_Kanana.kanana_pipeline import call_kanana
+        raw_text = call_kanana(
+            system_prompt = system_prompt,
+            user_input = {
+                "query": extended_query,
+                "document": parsed_document.document
+            },
+            max_new_tokens = 512
+        )
+        import json
+        from src.Agent_Kanana.kanana_pipeline import _extract_json_candidate, _repair_common_json_issues
+
+        try:
+            candidate = _extract_json_candidate(raw_text)
+            try:
+                parsed = json.loads(candidate)
+            except Exception:
+                parsed = json.loads(_repair_common_json_issues(candidate))
+
+            if isinstance(parsed, dict):
+                if "issues" in parsed:
+                    issues_value = parsed.get("issues", [])
+                    if isinstance(issues_value, dict):
+                        issues_value = [issues_value]
+                    if isinstance(issues_value, list):
+                        return IssuesList(issues=issues_value)
+
+                if "issue" in parsed:
+                    return IssuesList(issues=[parsed])
+
+            if isinstance(parsed, list):
+                return IssuesList(issues=parsed)
+        except Exception as parse_error:
+            print(f"⚠️ extract_issues fallback 파싱 실패: {parse_error}")
+            print(f"원본 응답(앞 300자): {raw_text[:300]}")
+
+        # 파싱 실패 시 워크플로우 중단 대신 빈 쟁점으로 진행
+        return IssuesList(issues=[])
 
 @tool
 def search_rag(combined_queries: QueryList, rag_method: str = "naive") -> RAGList:
@@ -270,8 +313,13 @@ def generate_search_queries(combined_queries: QueryList, enough_context: EnoughC
 @tool
 def search_web(web_search_queries: WebSearchQueries) -> WebSearchList:
     """외부 웹 검색을 수행하는 함수"""
-    tavily = TavilyClient(api_key = os.getenv("TAVILY_API_KEY"))
     try:
+        api_key = os.getenv("TAVILY_API_KEY")
+        if not api_key:
+            print("Error in search_web: TAVILY_API_KEY 환경변수가 설정되지 않았습니다.")
+            return WebSearchList(list_web_results = [])
+
+        tavily = TavilyClient(api_key = api_key)
         web_search_results = []
         for query in web_search_queries.web_search_queries:
             # 쿼리 길이 재검증 (안전장치)

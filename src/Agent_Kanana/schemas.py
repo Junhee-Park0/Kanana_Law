@@ -20,7 +20,7 @@ class DocumentIssue(BaseModel):
     issue : str = Field(..., description = "The issue extracted from the document")
     position : str = Field(..., description = "The position where the issue is located (e.g. 'Article 10', 'Section 2')")
     reason : str = Field(..., description = "The reason for the issue")
-    risk_summary : str = Field(..., description = "The risk summary of the document")
+    risk_summary : str = Field(default = "", description = "The risk summary of the document")
 
 class IssuesList(BaseModel):
     """DocumentIssue의 리스트"""
