@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Any, Literal
-from src.Agent_Kanana.schemas import (UserInput,
+from src.Agent.schemas import (UserInput,
                      CombinedQuery, QueryList, RAGOutput, RAGList, 
                      EnoughContext, WebSearchOutput, WebSearchList, 
                      ContextOutput, ContextList, AnswerOutput, AnswerEnough)
@@ -8,7 +8,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 def load_prompt_kanana(prompt_name: str) -> str:
     """Kanana 프롬프트를 불러오는 함수 - 전체 프롬프트를 문자열로 반환"""
-    with open(f"src/Agent_Kanana/prompts_kanana.yaml", "r", encoding = "utf-8") as f:
+    with open(f"src/Agent/prompts_kanana.yaml", "r", encoding = "utf-8") as f:
         prompts = yaml.safe_load(f)
         prompt = prompts.get(prompt_name, {})
     

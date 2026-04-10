@@ -4,15 +4,6 @@ nodes_kanana_track.py
 nodes_kanana.py의 모든 노드를 래핑하여 각 노드의 입·출력을
 JSON 파일로 기록하는 추적 레이어.
 
-사용법:
-  main_kanana.py 에서 아래처럼 import 경로만 변경하세요.
-
-  # 기존
-  from src.Agent_Kanana.nodes_kanana import routing_node, ...
-
-  # 변경 후
-  from src.Agent_Kanana.nodes_kanana_track import routing_node, ...
-
 로그 구조:
   logs/
     YYYY-MM-DD_HH-MM-SS/        ← 에이전트 1회 실행 = 폴더 1개
@@ -29,29 +20,13 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
-# 원본 노드 함수 전부 import
-from src.Agent_Kanana.nodes_kanana import (
-    routing_node,
-    query_rewriting_node,
-    document_parsing_node,
-    issue_extracting_node,
-    rag_searching_node,
-    context_evaluating_node,
-    web_searching_node,
-    context_filtering_node,
-    context_reranking_node,
-    answer_generating_node,
-    answer_evaluating_node,
-    answer_regenerating_node,
-)
+from src.Agent.nodes_kanana import (routing_node, query_rewriting_node, 
+                            document_parsing_node, issue_extracting_node, 
+                            rag_searching_node, context_evaluating_node, web_searching_node, 
+                            context_reranking_node, context_filtering_node, answer_generating_node, answer_evaluating_node, answer_regenerating_node)
 
 # 로그 기본 경로 (프로젝트 루트 기준)
 _BASE_LOG_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "logs")
-
-
-# ──────────────────────────────────────────────
-# 직렬화 헬퍼
-# ──────────────────────────────────────────────
 
 def _serialize(obj: Any) -> Any:
     """Pydantic 모델·dict·list 등을 JSON 직렬화 가능한 형태로 변환."""
@@ -65,13 +40,8 @@ def _serialize(obj: Any) -> Any:
         return [_serialize(item) for item in obj]
     if isinstance(obj, (str, int, float, bool)):
         return obj
-    # 그 외 타입은 문자열로 변환
+
     return str(obj)
-
-
-# ──────────────────────────────────────────────
-# NodeTracker 클래스
-# ──────────────────────────────────────────────
 
 class NodeTracker:
     """
@@ -122,21 +92,11 @@ class NodeTracker:
 
         print(f"[Tracker] {filename} 저장 완료")
 
-
-# 싱글톤 인스턴스
 tracker = NodeTracker()
-
-
-# ──────────────────────────────────────────────
-# 데코레이터
-# ──────────────────────────────────────────────
 
 def track_node(fn, *, is_entry: bool = False):
     """
     노드 함수를 감싸는 데코레이터.
-
-    is_entry=True 이면 노드 진입 시 tracker.init_run()을 호출하여
-    새 실행 폴더를 생성한다 (routing_node에 사용).
     """
     @functools.wraps(fn)
     def wrapper(state):
@@ -154,21 +114,15 @@ def track_node(fn, *, is_entry: bool = False):
 
     return wrapper
 
-
-# ──────────────────────────────────────────────
-# 추적이 적용된 노드 함수들
-# (main_kanana.py 에서 이 이름 그대로 import 하세요)
-# ──────────────────────────────────────────────
-
-routing_node             = track_node(routing_node,             is_entry=True)
-query_rewriting_node     = track_node(query_rewriting_node)
-document_parsing_node    = track_node(document_parsing_node)
-issue_extracting_node    = track_node(issue_extracting_node)
-rag_searching_node       = track_node(rag_searching_node)
-context_evaluating_node  = track_node(context_evaluating_node)
-web_searching_node       = track_node(web_searching_node)
-context_filtering_node   = track_node(context_filtering_node)
-context_reranking_node   = track_node(context_reranking_node)
-answer_generating_node   = track_node(answer_generating_node)
-answer_evaluating_node   = track_node(answer_evaluating_node)
+routing_node = track_node(routing_node, is_entry=True)
+query_rewriting_node = track_node(query_rewriting_node)
+document_parsing_node = track_node(document_parsing_node)
+issue_extracting_node = track_node(issue_extracting_node)
+rag_searching_node = track_node(rag_searching_node)
+context_evaluating_node = track_node(context_evaluating_node)
+web_searching_node = track_node(web_searching_node)
+context_filtering_node = track_node(context_filtering_node)
+context_reranking_node = track_node(context_reranking_node)
+answer_generating_node = track_node(answer_generating_node)
+answer_evaluating_node = track_node(answer_evaluating_node)
 answer_regenerating_node = track_node(answer_regenerating_node)

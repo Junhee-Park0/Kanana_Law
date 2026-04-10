@@ -28,8 +28,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from config import Config
-from src.Agent_Kanana.schemas import UserInput, AnswerOutput
-from src.Agent_Kanana.kanana_pipeline import get_kanana_pipeline
+from src.Agent.schemas import UserInput, AnswerOutput
+from src.Agent.kanana_pipeline import get_kanana_pipeline
 
 # ============================================================================
 # 업로드 파일 저장 경로 
@@ -122,12 +122,15 @@ def _run_agent(job_id: str, query: Optional[str], document_path: Optional[str]):
                 "status": "done",
                 "completed_at": datetime.now().isoformat(),
                 "result": {
-                    "input_type": answer_obj.input_type,
                     "answer": answer_obj.answer,
                     "sources": answer_obj.source,
-                    "risk_summary": answer_obj.risk_summary,
-                    "confidence_score": answer_obj.confidence_score,
+                    "metadata":
+                    {
+                        "input_type": answer_obj.input_type,
+                        "risk_summary": answer_obj.risk_summary,
+                        "confidence_score": answer_obj.confidence_score,
                 },
+            }
             })
         else:
             jobs[job_id].update({

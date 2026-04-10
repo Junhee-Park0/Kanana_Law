@@ -13,22 +13,22 @@ from config import Config
 import utils.logger as app_logger
 from utils.logger import log_agent_action
 
-from src.Agent_Kanana.tools_kanana import (extend_query, parse_document_ocr, check_query_answerable, extract_issues, 
+from src.Agent.tools_kanana import (extend_query, parse_document_ocr, check_query_answerable, extract_issues, 
                     search_rag, check_enough_context, generate_search_queries, search_web, 
                     rerank_contexts, generate_answer, confirm_answer, retry_answer)
-from src.Agent_Kanana.schemas import (UserInput, InputDocument, DocumentIssue, IssuesList, 
+from src.Agent.schemas import (UserInput, InputDocument, DocumentIssue, IssuesList, 
                     CombinedQuery, QueryList, RAGOutput, RAGList, 
                     EnoughContext, WebSearchQueries, WebSearchOutput, WebSearchList, 
                     ContextOutput, ContextList, AnswerOutput, AnswerEnough)
-from src.Agent_Kanana.states import LegalAgentState
-from src.Agent_Kanana.functions import (load_prompt_kanana, route_by_input_type, document_ocr, filter_low_relevance_contexts,
+from src.Agent.states import LegalAgentState
+from src.Agent.functions import (load_prompt_kanana, route_by_input_type, document_ocr, filter_low_relevance_contexts,
                     route_by_enough_context, route_by_enough_answer, should_regenerate, route_after_document_parsing)
 # Kanana 버전의 nodes를 import
-from src.Agent_Kanana.nodes_kanana_track import (routing_node, query_rewriting_node, 
+from src.Agent.nodes_kanana_track import (routing_node, query_rewriting_node, 
                             document_parsing_node, issue_extracting_node, 
                             rag_searching_node, context_evaluating_node, web_searching_node, 
                             context_reranking_node, context_filtering_node, answer_generating_node, answer_evaluating_node, answer_regenerating_node)
-from src.Agent_Kanana.kanana_pipeline import get_kanana_pipeline
+from src.Agent.kanana_pipeline import get_kanana_pipeline
 
 def legal_agent():
     """Legal Agent 그래프"""

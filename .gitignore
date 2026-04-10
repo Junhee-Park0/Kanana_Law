@@ -6,5 +6,6 @@
 # 제외할 파일들
 /logs
 /data 
+/test
 /database
 /Kanana_Model

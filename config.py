@@ -8,8 +8,6 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# 프로젝트 루트(.env) 경로를 명시적으로 로드
-# 실행 CWD(예: /workspace, /workspace/Kanana_Law)에 영향받지 않도록 한다.
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _DOTENV_PATH = _PROJECT_ROOT / ".env"
 load_dotenv(dotenv_path = _DOTENV_PATH)

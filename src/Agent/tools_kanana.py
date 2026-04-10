@@ -1,16 +1,16 @@
 from langchain_community.tools import tool
 from typing import List, Dict, Optional, Any, Literal
 from pydantic import BaseModel, Field
-from src.Agent_Kanana.schemas import (UserInput, InputDocument, QueryAnswerable,
+from src.Agent.schemas import (UserInput, InputDocument, QueryAnswerable,
                      DocumentIssue, IssuesList, CombinedQuery, QueryList, 
                      RAGOutput, RAGList, EnoughContext, RerankItem, RerankList,
                      WebSearchQueries, WebSearchOutput, WebSearchList, 
                      ContextOutput, ContextList, AnswerOutput, AnswerEnough, Metadata)
-from src.Agent_Kanana.functions import load_prompt_kanana, document_ocr, truncate_context_texts
+from src.Agent.functions import load_prompt_kanana, document_ocr, truncate_context_texts
 
 import chromadb
 from src.RAG.search_kanana_main import NaiveSearchWithAnswer
-from src.Agent_Kanana.kanana_pipeline import call_kanana, call_kanana_structured
+from src.Agent.kanana_pipeline import call_kanana, call_kanana_structured
 
 from tavily import TavilyClient
 import os
@@ -113,7 +113,7 @@ def extract_issues(extended_query: str, parsed_document: InputDocument) -> Issue
     except Exception as e:
         # 모델이 단일 객체({"issue": ...})를 반환하는 경우를 방어적으로 보정
         print(f"⚠️ IssuesList 파싱 실패, 단일 쟁점 보정 시도: {e}")
-        from src.Agent_Kanana.kanana_pipeline import call_kanana
+        from src.Agent.kanana_pipeline import call_kanana
         raw_text = call_kanana(
             system_prompt = system_prompt,
             user_input = {
@@ -123,7 +123,7 @@ def extract_issues(extended_query: str, parsed_document: InputDocument) -> Issue
             max_new_tokens = 512
         )
         import json
-        from src.Agent_Kanana.kanana_pipeline import _extract_json_candidate, _repair_common_json_issues
+        from src.Agent.kanana_pipeline import _extract_json_candidate, _repair_common_json_issues
 
         try:
             candidate = _extract_json_candidate(raw_text)
@@ -164,7 +164,7 @@ def search_rag(combined_queries: QueryList, rag_method: str = "naive") -> RAGLis
         unique_results = {} 
         
         # Kanana pipeline 가져오기
-        from src.Agent_Kanana.kanana_pipeline import get_kanana_pipeline
+        from src.Agent.kanana_pipeline import get_kanana_pipeline
         pipeline, _ = get_kanana_pipeline()
         
         for query in search_queries:
