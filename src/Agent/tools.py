@@ -6,7 +6,7 @@ from src.Agent.schemas import (UserInput, InputDocument, QueryAnswerable,
                      RAGOutput, RAGList, EnoughContext, RerankItem, RerankList,
                      WebSearchQueries, WebSearchOutput, WebSearchList, 
                      ContextOutput, ContextList, AnswerOutput, AnswerEnough, Metadata)
-from src.Agent.functions import load_prompt_kanana, document_ocr, truncate_context_texts
+from src.Agent.functions import load_prompt, document_ocr, truncate_context_texts
 
 import chromadb
 from src.RAG.search_kanana_main import NaiveSearchWithAnswer
@@ -19,7 +19,7 @@ import os
 def extend_query(original_query: str) -> str:
     """쿼리를 받아서 법률 용어로 확장, 재구성하는 함수"""
     try:
-        system_prompt = load_prompt_kanana("extend_query_prompt")
+        system_prompt = load_prompt("extend_query_prompt")
         
         print(f"🔄 쿼리 확장 중... (원본: '{original_query}')")
         
@@ -63,7 +63,7 @@ def extend_query(original_query: str) -> str:
 @tool
 def parse_document_ocr(ocr_result: Any) -> InputDocument:
     """OCR 결과를 파싱하는 함수"""
-    system_prompt = load_prompt_kanana("parse_document_ocr_prompt")
+    system_prompt = load_prompt("parse_document_ocr_prompt")
     response = call_kanana(
         system_prompt = system_prompt,
         user_input = {"document_ocr": ocr_result},
@@ -75,7 +75,7 @@ def parse_document_ocr(ocr_result: Any) -> InputDocument:
 @tool
 def check_query_answerable(extended_query: str) -> QueryAnswerable:
     """문서 없이 질문만으로 답변 가능한지 LLM에게 물어보는 함수"""
-    system_prompt = load_prompt_kanana("check_query_answerable_prompt")
+    system_prompt = load_prompt("check_query_answerable_prompt")
     response = call_kanana(
         system_prompt = system_prompt,
         user_input = {"extended_query": extended_query},
@@ -98,7 +98,7 @@ def check_query_answerable(extended_query: str) -> QueryAnswerable:
 @tool
 def extract_issues(extended_query: str, parsed_document: InputDocument) -> IssuesList:
     """파싱된 문서를 받아와서 쟁점을 추출하는 함수 (질문 들어오면 질문 있는 거랑 관련 짓도록 설정)"""
-    system_prompt = load_prompt_kanana("extract_issues_prompt")
+    system_prompt = load_prompt("extract_issues_prompt")
     try:
         response = call_kanana_structured(
             system_prompt = system_prompt,
@@ -209,7 +209,7 @@ def search_rag(combined_queries: QueryList, rag_method: str = "naive") -> RAGLis
 @tool
 def check_enough_context(combined_queries: QueryList, contexts: ContextList) -> EnoughContext:
     """RAG 결과 또는 RAG + 웹 검색 결과로 충분한 답변이 가능한지 여부를 확인하는 함수"""
-    system_prompt = load_prompt_kanana("enough_context_prompt")
+    system_prompt = load_prompt("enough_context_prompt")
 
     queries_str = ""
     for i, query in enumerate(combined_queries.combined_queries, 1):
@@ -259,7 +259,7 @@ def generate_search_queries(combined_queries: QueryList, enough_context: EnoughC
         
         # 이전 쿼리가 있으면 수정 프롬프트 사용, 없으면 생성 프롬프트 사용
         if previous_queries and previous_queries.web_search_queries:
-            system_prompt = load_prompt_kanana("revise_search_queries_prompt")
+            system_prompt = load_prompt("revise_search_queries_prompt")
     
 
             previous_queries_str = "\n".join([f"{i+1}. {q}" for i, q in enumerate(previous_queries.web_search_queries)])
@@ -274,7 +274,7 @@ def generate_search_queries(combined_queries: QueryList, enough_context: EnoughC
                 max_new_tokens = 256
             )
         else:
-            system_prompt = load_prompt_kanana("generate_search_queries_prompt")
+            system_prompt = load_prompt("generate_search_queries_prompt")
     
             response = call_kanana_structured(
                 system_prompt = system_prompt,
@@ -475,7 +475,7 @@ def generate_answer(extended_query: str, contexts: ContextList, extracted_issues
     contexts = truncate_context_texts(contexts, max_text_length = 2000)
     
     # 프롬프트와 컨텍스트가 많을 수 있으므로 답변 토큰을 약간 줄임
-    system_prompt = load_prompt_kanana("generate_answer_prompt")
+    system_prompt = load_prompt("generate_answer_prompt")
     context_count = len(contexts.list_contexts)
     min_required = max(4, int(context_count * 0.7))  # 최소 70% 이상 활용
     
@@ -572,7 +572,7 @@ def retry_answer(extended_query: str, contexts: ContextList, extracted_issues: O
     # 컨텍스트 텍스트 길이 제한
     contexts = truncate_context_texts(contexts, max_text_length = 2000)
     
-    system_prompt = load_prompt_kanana("retry_answer_prompt")
+    system_prompt = load_prompt("retry_answer_prompt")
     response = call_kanana_structured(
         system_prompt = system_prompt,
         user_input = {

@@ -28,6 +28,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from config import Config
+PORT_NUM = Config.PORT_NUM
 from src.Agent.schemas import UserInput, AnswerOutput
 from src.Agent.kanana_pipeline import get_kanana_pipeline
 
@@ -237,7 +238,7 @@ async def ask(
     )
 
 
-@app.get("/api/jobs/{job_id}", response_model=JobStatusResponse, tags=["에이전트"])
+@app.get("/api/jobs/{job_id}", response_model = JobStatusResponse, tags = ["에이전트"])
 async def get_job(job_id: str):
     """
     작업 상태와 결과를 조회합니다.
@@ -286,4 +287,4 @@ async def startup_event():
 # ============================================================================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("api:app", host = "0.0.0.0", port = PORT_NUM, reload = False)

@@ -73,6 +73,21 @@ def ensure_law_db() -> None:
 
     print("✅ DB 확인 완료")
 
+def ensure_env_file() -> None:
+    """
+    .env 파일에 Tavily API 접근을 위한 API_KEY 설정이 있는지 확인합니다.
+    """
+    if not Path(".env").exists():
+        raise FileNotFoundError(".env 파일이 없습니다. 환경 변수를 설정해주세요.")
+    
+    with open(".env", "r") as f:
+        for line in f:
+            if "TAVILY_API_KEY" in line:
+                return
+    
+    raise ValueError("TAVILY_API_KEY이 설정되어 있지 않습니다. .env 파일에 TAVILY_API_KEY을 설정해주세요.")
+
+
 
 def main() -> None:
     print("초기 환경 점검을 시작합니다.")
