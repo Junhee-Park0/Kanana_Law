@@ -98,8 +98,8 @@ def call_kanana(system_prompt: str, user_input: dict, max_new_tokens: int = 512)
         response = pipeline(
             messages,
             max_new_tokens = max_new_tokens,
-            temperature = None,
-            do_sample = False,
+            temperature = 0.2,
+            do_sample = True,
             return_full_text = False,
             eos_token_id = tokenizer.eos_token_id
         )

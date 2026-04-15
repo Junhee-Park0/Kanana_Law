@@ -1,5 +1,4 @@
 import logging
-import sys
 from datetime import datetime
 from pathlib import Path
 from config import Config
@@ -25,11 +24,6 @@ def setup_logger(name: str = "Legal_Agent"):
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    
-    # 콘솔 핸들러
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
     
     # 파일 핸들러
     if Config.ENABLE_LOCAL_LOGGING:

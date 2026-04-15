@@ -12,7 +12,7 @@ load_dotenv(".env")
 from utils.logger import logger, log_agent_action
 
 # Kanana 버전의 tools를 import
-from src.Agent.tools_kanana import (extend_query, parse_document_ocr, check_query_answerable, extract_issues,
+from src.Agent.tools import (extend_query, parse_document_ocr, check_query_answerable, extract_issues,
                     search_rag, check_enough_context, generate_search_queries, search_web, 
                     rerank_contexts, generate_answer, confirm_answer, retry_answer)
 from src.Agent.schemas import (UserInput, InputDocument, DocumentIssue, IssuesList, 
@@ -20,7 +20,7 @@ from src.Agent.schemas import (UserInput, InputDocument, DocumentIssue, IssuesLi
                     EnoughContext, WebSearchQueries, WebSearchOutput, WebSearchList, 
                     ContextOutput, ContextList, AnswerOutput, AnswerEnough)
 from src.Agent.states import LegalAgentState
-from src.Agent.functions import load_prompt_kanana, determine_input_type, document_ocr, filter_low_relevance_contexts
+from src.Agent.functions import load_prompt, determine_input_type, document_ocr, filter_low_relevance_contexts
 
 # Nodes
 def routing_node(state: LegalAgentState) -> LegalAgentState:
@@ -42,7 +42,7 @@ def query_rewriting_node(state: LegalAgentState) -> LegalAgentState:
     print(f"기존 쿼리 : {state['input_query']}")
     print(f"확장 쿼리 : {extended_query}")
 
-    logger.info(f"> 재작성된 쿼리| {extended_query}")
+    logger.debug(f"> 재작성된 쿼리| {extended_query}")
 
     return {"extended_query": extended_query}
 
@@ -316,8 +316,7 @@ def answer_evaluating_node(state: LegalAgentState) -> LegalAgentState:
         "contexts": contexts, 
         "answer": state["answer"]
     })
-    print(f"답변 평가 결과 : {answer_enough.kind}")
-    logger.info(f"> 답변 평가 결과| {answer_enough.kind}")
+    logger.debug(f"> 답변 평가 결과| {answer_enough.kind}")
     return {"answer_enough": answer_enough}
     
 def answer_regenerating_node(state: LegalAgentState) -> LegalAgentState:

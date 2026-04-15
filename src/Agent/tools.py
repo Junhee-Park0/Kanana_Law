@@ -361,7 +361,7 @@ def search_web(web_search_queries: WebSearchQueries) -> WebSearchList:
 def rerank_contexts(combined_queries: QueryList, all_contexts: ContextList) -> ContextList:
     """컨텍스트를 재정렬하는 함수(rank 부분에 값 채워넣기)"""
     try:
-        system_prompt = load_prompt_kanana("rerank_contexts_prompt")
+        system_prompt = load_prompt("rerank_contexts_prompt")
 
         # combined_queries를 문자열로 변환
         queries_str = ""
@@ -456,7 +456,7 @@ def rerank_contexts(combined_queries: QueryList, all_contexts: ContextList) -> C
         return ContextList(list_contexts = [])
 
 @tool
-def generate_answer(extended_query: str, contexts: ContextList, extracted_issues: Optional[IssuesList], input_type: Literal["Query_Only", "Hybrid", "Error"]) -> AnswerOutput:
+def generate_answer(extended_query: str, contexts: ContextList, extracted_issues: Optional[IssuesList]) -> AnswerOutput:
     """최종 컨텍스트를 받아서 응답을 생성하는 함수"""
     # 토큰 제한을 고려하여 컨텍스트를 제한
     original_count = len(contexts.list_contexts)
@@ -485,7 +485,6 @@ def generate_answer(extended_query: str, contexts: ContextList, extracted_issues
             "extended_query": extended_query, 
             "contexts": str(contexts), 
             "extracted_issues": str(extracted_issues) if extracted_issues else "없음 (Query_Only 모드)",
-            "input_type": input_type,
             "context_count": str(context_count),
             "min_required_docs": str(min_required)},
         output_schema = AnswerOutput,
@@ -534,7 +533,7 @@ def confirm_answer(extended_query: str, contexts: ContextList, extracted_issues:
         )
     
     # 3차 검증: LLM을 통한 답변 품질 평가
-    system_prompt = load_prompt_kanana("confirm_answer_prompt")
+    system_prompt = load_prompt("confirm_answer_prompt")
     response_text = call_kanana(
         system_prompt = system_prompt,
         user_input = {
