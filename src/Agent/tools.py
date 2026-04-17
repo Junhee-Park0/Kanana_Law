@@ -380,11 +380,11 @@ def rerank_contexts(combined_queries: QueryList, all_contexts: ContextList) -> C
         MAX_WEB = 7
         rag_contexts = sorted(
             [ctx for ctx in all_contexts.list_contexts if ctx.doc_type == "Internal_DB"],
-            key=lambda x: x.relevance_score, reverse=True
+            key = lambda x: x.relevance_score, reverse = True
         )[:MAX_RAG]
         web_contexts = sorted(
             [ctx for ctx in all_contexts.list_contexts if ctx.doc_type == "External_Web"],
-            key=lambda x: x.relevance_score, reverse=True
+            key = lambda x: x.relevance_score, reverse = True
         )[:MAX_WEB]
         contexts_to_llm = rag_contexts + web_contexts
         total_input = len(all_contexts.list_contexts)
@@ -460,36 +460,67 @@ def generate_answer(extended_query: str, contexts: ContextList, extracted_issues
     """최종 컨텍스트를 받아서 응답을 생성하는 함수"""
     # 토큰 제한을 고려하여 컨텍스트를 제한
     original_count = len(contexts.list_contexts)
-    max_contexts = 12  # 토큰 제한을 고려한 최대 컨텍스트 개수
+    max_contexts = 8  # JSON 잘림 방지를 위해 컨텍스트 개수를 더 보수적으로 제한
     
     if original_count > max_contexts:
         print(f"⚠️ 컨텍스트가 {original_count}개로 많아 상위 {max_contexts}개만 사용합니다.")
         sorted_contexts = sorted(
             contexts.list_contexts,
-            key=lambda x: (x.relevance_score, -x.rank if x.rank is not None else 0),
-            reverse=True
+            key = lambda x: (x.relevance_score, -x.rank if x.rank is not None else 0),
+            reverse = True
         )
         contexts = ContextList(list_contexts=sorted_contexts[:max_contexts])
     
-    # 각 컨텍스트의 텍스트 길이 제한 (원본 텍스트를 2000자로 제한)
-    contexts = truncate_context_texts(contexts, max_text_length = 2000)
+    # 각 컨텍스트의 텍스트 길이 제한 (원본 텍스트를 1200자로 제한)
+    contexts = truncate_context_texts(contexts, max_text_length = 1200)
     
     # 프롬프트와 컨텍스트가 많을 수 있으므로 답변 토큰을 약간 줄임
     system_prompt = load_prompt("generate_answer_prompt")
     context_count = len(contexts.list_contexts)
     min_required = max(4, int(context_count * 0.7))  # 최소 70% 이상 활용
     
-    response = call_kanana_structured(
-        system_prompt = system_prompt,
-        user_input = {
-            "extended_query": extended_query, 
-            "contexts": str(contexts), 
-            "extracted_issues": str(extracted_issues) if extracted_issues else "없음 (Query_Only 모드)",
-            "context_count": str(context_count),
-            "min_required_docs": str(min_required)},
-        output_schema = AnswerOutput,
-        max_new_tokens = 1024
-    )
+    user_input_payload = {
+        "extended_query": extended_query,
+        "contexts": str(contexts),
+        "extracted_issues": str(extracted_issues) if extracted_issues else "없음 (Query_Only 모드)",
+        "context_count": str(context_count),
+        "min_required_docs": str(min_required)
+    }
+
+    try:
+        response = call_kanana_structured(
+            system_prompt = system_prompt,
+            user_input = user_input_payload,
+            output_schema = AnswerOutput,
+            max_new_tokens = 900
+        )
+    except Exception as e:
+        print(f"⚠️ AnswerOutput 구조화 파싱 실패. 폴백 생성으로 전환: {e}")
+        fallback_prompt = (
+            system_prompt
+            + "\n\n[폴백 지시]\n"
+              "- JSON 없이 답변 본문만 간결하게 작성하세요.\n"
+              "- 6~10문장으로 핵심만 정리하세요.\n"
+              "- 마지막에 '## 참고자료' 섹션을 반드시 포함하세요.\n"
+        )
+        raw_answer = call_kanana(
+            system_prompt = fallback_prompt,
+            user_input = user_input_payload,
+            max_new_tokens = 600
+        )
+        fallback_sources = [ctx.source for ctx in contexts.list_contexts[:min_required]]
+        fallback_text = (raw_answer or "").strip()
+        if "## 참고자료" not in fallback_text:
+            refs = "\n\n## 참고자료\n\n" + "\n".join(
+                [f"[{idx}] {src}" for idx, src in enumerate(fallback_sources, 1)]
+            )
+            fallback_text = fallback_text.rstrip() + refs
+        response = AnswerOutput(
+            answer = fallback_text,
+            source = fallback_sources,
+            risk_summary = "구조화 출력(JSON) 파싱 실패로 폴백 응답을 사용했습니다.",
+            confidence_score = 0.4
+        )
     
     # 참고자료 검증...
     if "## 참고자료" not in response.answer:
@@ -569,18 +600,36 @@ def confirm_answer(extended_query: str, contexts: ContextList, extracted_issues:
 def retry_answer(extended_query: str, contexts: ContextList, extracted_issues: Optional[IssuesList], previous_answer: AnswerOutput, feedback: AnswerEnough) -> AnswerOutput:
     """최종 답변과 피드백을 받아서 재생성하는 함수"""
     # 컨텍스트 텍스트 길이 제한
-    contexts = truncate_context_texts(contexts, max_text_length = 2000)
+    contexts = truncate_context_texts(contexts, max_text_length = 1200)
     
     system_prompt = load_prompt("retry_answer_prompt")
-    response = call_kanana_structured(
-        system_prompt = system_prompt,
-        user_input = {
-            "extended_query": extended_query, 
-            "contexts": str(contexts), 
-            "extracted_issues": str(extracted_issues) if extracted_issues else "없음 (Query_Only 모드)",
-            "previous_answer": str(previous_answer), 
-            "feedback": str(feedback)},
-        output_schema = AnswerOutput,
-        max_new_tokens = 1024
-    )
-    return response
+    user_input_payload = {
+        "extended_query": extended_query,
+        "contexts": str(contexts),
+        "extracted_issues": str(extracted_issues) if extracted_issues else "없음 (Query_Only 모드)",
+        "previous_answer": str(previous_answer),
+        "feedback": str(feedback)
+    }
+    try:
+        response = call_kanana_structured(
+            system_prompt = system_prompt,
+            user_input = user_input_payload,
+            output_schema = AnswerOutput,
+            max_new_tokens = 900
+        )
+        return response
+    except Exception as e:
+        print(f"⚠️ retry_answer 구조화 파싱 실패. 이전 답변 기반 폴백 반환: {e}")
+        fallback_sources = previous_answer.source[:]
+        fallback_text = previous_answer.answer
+        if "## 참고자료" not in fallback_text:
+            refs = "\n\n## 참고자료\n\n" + "\n".join(
+                [f"[{idx}] {src}" for idx, src in enumerate(fallback_sources, 1)]
+            )
+            fallback_text = fallback_text.rstrip() + refs
+        return AnswerOutput(
+            answer = fallback_text,
+            source = fallback_sources,
+            risk_summary = (previous_answer.risk_summary or "") + " | 재생성 JSON 파싱 실패로 이전 답변을 유지했습니다.",
+            confidence_score = min(previous_answer.confidence_score, 0.4)
+        )

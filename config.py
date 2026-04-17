@@ -24,14 +24,17 @@ class Config:
     # 모델 설정
     # ============================================================================
     # Kanana 모델
+    EMBEDDING_MODEL_NAME = "BAAI/bge-m3"
     KANANA_MODEL_NAME = "kakaocorp/kanana-1.5-2.1b-instruct-2505"
-    KANANA_MAX_NEW_TOKENS = int(os.getenv("KANANA_MAX_NEW_TOKENS", "512"))
+    KANANA_MAX_NEW_TOKENS = int(os.getenv("KANANA_MAX_NEW_TOKENS", "1024"))
+    EMBEDDING_DEVICE = "cpu"
 
     # ============================================================================
     # 경로 설정
     # ============================================================================
     LOG_DIR = "./logs"
     KANANA_MODEL_PATH = "./Kanana_Model"
+    EMBEDDING_MODEL_PATH = f"./Embedding_Model"
     
     # ============================================================================
     # FastAPI 경로 설정

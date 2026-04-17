@@ -139,7 +139,6 @@ class WebSearchList(BaseModel):
 
 class AnswerOutput(BaseModel):
     """최종 답변 형식"""
-    input_type : Literal["Query_Only", "Hybrid", "Error"] 
     answer : str = Field(
         ..., 
         description = "The final answer. MUST end with '## 참고자료' section that lists all cited sources. "

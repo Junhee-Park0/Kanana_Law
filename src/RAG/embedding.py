@@ -6,34 +6,35 @@ from typing import Dict, List, Optional
 
 import numpy as np
 from sentence_transformers import SentenceTransformer
-import torch
+
+from config import Config
 
 # 모듈 수준 싱글톤 — 프로세스 전체에서 한 번만 로드됨
 _embedding_model: Optional[SentenceTransformer] = None
-_EMBEDDING_MODEL_NAME = "BAAI/bge-m3"
+_EMBEDDING_MODEL_NAME = Config.EMBEDDING_MODEL_NAME
+_EMBEDDING_MODEL_PATH = Config.EMBEDDING_MODEL_PATH
+# Kanana LLM과 별도로 VRAM을 사용하기 위해 임베딩 모델은 항상 CPU
+_EMBEDDING_DEVICE = Config.EMBEDDING_DEVICE
 
 def _get_embedding_model() -> SentenceTransformer:
     """BGE-M3 모델 싱글톤을 반환한다. 최초 호출 시에만 로드된다."""
     global _embedding_model
     if _embedding_model is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = _EMBEDDING_DEVICE
         print(f"📥 BGE-M3 임베딩 모델 로드 중... (device: {device})")
         try:
-            _embedding_model = SentenceTransformer(
-                _EMBEDDING_MODEL_NAME, device=device, local_files_only=True
-            )
+            _embedding_model = SentenceTransformer(str(_EMBEDDING_MODEL_PATH), device = device)
         except Exception:
             print("⚠️ 로컬 캐시 로드 실패 — HuggingFace에서 다운로드합니다.")
-            _embedding_model = SentenceTransformer(_EMBEDDING_MODEL_NAME, device=device)
+            _embedding_model = SentenceTransformer(_EMBEDDING_MODEL_NAME, device = device)
         _embedding_model.max_seq_length = 512
         print("✅ BGE-M3 임베딩 모델 로드 완료")
     return _embedding_model
 
-
 class LawEmbeddings:
     def __init__(self, model_name: str = _EMBEDDING_MODEL_NAME):
         self.model_name = model_name
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = _EMBEDDING_DEVICE
 
     @property
     def model(self) -> SentenceTransformer:

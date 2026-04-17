@@ -39,6 +39,7 @@ class LegalAgentState(TypedDict, total = False):
 
     # [Answer]
     answer : AnswerOutput # 최종 답변
+    answer_contexts : ContextList # 답변 생성/검증/재생성에 공통으로 사용하는 컨텍스트
     answer_enough : AnswerEnough # 최종 답변 적합성 확인
     answer_retry_count : int # 답변 재생성 횟수 (3회 이상 실패 시 종료)
     answer_history : Annotated[List[AnswerOutput], operator.add] # 답변 재생성 기록

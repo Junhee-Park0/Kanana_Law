@@ -3,6 +3,7 @@ Legal Agent 구성 노드들 - Kanana 버전
 """
 
 from langgraph.graph import StateGraph, END, START
+from typing import Optional
 
 import os
 from dotenv import load_dotenv
@@ -21,6 +22,34 @@ from src.Agent.schemas import (UserInput, InputDocument, DocumentIssue, IssuesLi
                     ContextOutput, ContextList, AnswerOutput, AnswerEnough)
 from src.Agent.states import LegalAgentState
 from src.Agent.functions import load_prompt, determine_input_type, document_ocr, filter_low_relevance_contexts
+
+def _append_hybrid_issues_to_answer(answer_text: str, extracted_issues: Optional[IssuesList]) -> str:
+    """Hybrid 모드에서만 답변 본문에 추출 쟁점 요약을 붙인다."""
+    if not extracted_issues or not extracted_issues.issues:
+        return answer_text
+
+    # 중복 삽입 방지
+    if "## 문서 쟁점 요약" in answer_text:
+        return answer_text
+
+    issue_lines = []
+    for idx, issue in enumerate(extracted_issues.issues, 1):
+        line = f"- [{idx}] {issue.issue}"
+        if getattr(issue, "position", None):
+            line += f" (위치: {issue.position})"
+        if getattr(issue, "reason", None):
+            line += f" - 사유: {issue.reason}"
+        issue_lines.append(line)
+
+    issues_section = "## 문서 쟁점 요약\n\n" + "\n".join(issue_lines)
+
+    # '## 참고자료'는 답변 맨 끝 요구사항이 있으므로 그 앞에 삽입
+    ref_header = "## 참고자료"
+    if ref_header in answer_text:
+        body, refs = answer_text.split(ref_header, 1)
+        return body.rstrip() + "\n\n" + issues_section + "\n\n" + ref_header + refs
+
+    return answer_text.rstrip() + "\n\n" + issues_section
 
 # Nodes
 def routing_node(state: LegalAgentState) -> LegalAgentState:
@@ -91,6 +120,7 @@ def issue_extracting_node(state: LegalAgentState) -> LegalAgentState:
     print("📄  문서 파싱 및 쟁점 추출")
     print("-" * 50)
     print(f"추출된 쟁점 수 : {len(extracted_issues.issues)}")
+    print(f"추출된 쟁점 : {extracted_issues.issues}")
     logger.info(f"> 추출된 쟁점 수| {len(extracted_issues.issues)}")
     return {"extracted_issues": extracted_issues}
 
@@ -131,7 +161,7 @@ def context_evaluating_node(state: LegalAgentState) -> LegalAgentState:
     current_retry = state.get("context_retry_count", 0)
     print(f"컨텍스트 재생성 횟수 : {current_retry}")
     logger.info(f"> 컨텍스트 재생성 횟수| {current_retry}")
-    if current_retry >= 1:
+    if current_retry >= 3:
         logger.info(f"> 컨텍스트 재생성 횟수가 최대 횟수에 도달하였습니다. 현재까지의 컨텍스트를 사용합니다.")
         print("❗컨텍스트 재생성 횟수가 최대 횟수에 도달하였습니다. 현재까지의 컨텍스트를 사용합니다.\n")
         enough_context = EnoughContext(
@@ -287,16 +317,25 @@ def answer_generating_node(state: LegalAgentState) -> LegalAgentState:
     else:
         contexts = ContextList(list_contexts=state.get("all_contexts", []))
     
+    # generate_answer와 동일 기준으로 평가/재생성에 사용할 컨텍스트를 고정
+    max_contexts = 8
+    sorted_contexts = sorted(
+        contexts.list_contexts,
+        key = lambda x: (x.relevance_score, -x.rank if x.rank is not None else 0),
+        reverse = True
+    )
+    answer_contexts = ContextList(list_contexts = sorted_contexts[:max_contexts])
+
     answer = generate_answer.invoke({
         "extended_query": state["extended_query"], 
         "extracted_issues": state.get("extracted_issues"),
-        "contexts": contexts, 
-        "input_type": state["input_type"],
-        "max_new_tokens": 1024
+        "contexts": answer_contexts
     })
+    if state.get("input_type") == "Hybrid":
+        answer.answer = _append_hybrid_issues_to_answer(answer.answer, state.get("extracted_issues"))
     print(f"생성된 답변 : {answer.answer}")
     logger.info(f"> 생성된 답변| {answer.answer}")
-    return {"answer": answer, "answer_history": [answer]}
+    return {"answer": answer, "answer_contexts": answer_contexts, "answer_history": [answer]}
     
 def answer_evaluating_node(state: LegalAgentState) -> LegalAgentState:
     """답변을 평가하는 노드"""
@@ -305,7 +344,9 @@ def answer_evaluating_node(state: LegalAgentState) -> LegalAgentState:
     print("⚖️  답변 평가")
     print("-" * 50)
     print(f"\n답변 평가 중...")
-    if "reranked_contexts" in state and state["reranked_contexts"]:
+    if "answer_contexts" in state and state["answer_contexts"]:
+        contexts = state["answer_contexts"]
+    elif "reranked_contexts" in state and state["reranked_contexts"]:
         contexts = state["reranked_contexts"]
     else:
         contexts = ContextList(list_contexts=state.get("all_contexts", []))
@@ -327,7 +368,7 @@ def answer_regenerating_node(state: LegalAgentState) -> LegalAgentState:
     print("-" * 50)
     current_retry = state.get("answer_retry_count", 0)
     logger.info(f"> 답변 재생성 횟수| {current_retry}")
-    if current_retry >= 1:
+    if current_retry >= 3:
         print("❗답변 재생성 횟수가 최대 횟수에 도달하였습니다. 가장 높은 신뢰도의 답변을 선택합니다.")
         logger.info(f"> 답변 재생성 횟수가 최대 횟수에 도달하였습니다. 가장 높은 신뢰도의 답변을 선택합니다.")
         answer_history = state.get("answer_history", [])
@@ -339,7 +380,9 @@ def answer_regenerating_node(state: LegalAgentState) -> LegalAgentState:
         # answer_retry_count를 should_regenerate의 종료 임계값(3) 이상으로 설정하여 루프 탈출
         return {"answer": best_answer, "answer_retry_count": 3}
     
-    if "reranked_contexts" in state and state["reranked_contexts"]:
+    if "answer_contexts" in state and state["answer_contexts"]:
+        contexts = state["answer_contexts"]
+    elif "reranked_contexts" in state and state["reranked_contexts"]:
         contexts = state["reranked_contexts"]
     else:
         contexts = ContextList(list_contexts=state.get("all_contexts", []))
@@ -349,9 +392,10 @@ def answer_regenerating_node(state: LegalAgentState) -> LegalAgentState:
         "extracted_issues": state.get("extracted_issues"),
         "contexts": contexts, 
         "previous_answer": state["answer"], 
-        "feedback": state["answer_enough"],
-        "max_new_tokens": 1024
+        "feedback": state["answer_enough"]
     })
+    if state.get("input_type") == "Hybrid":
+        new_answer.answer = _append_hybrid_issues_to_answer(new_answer.answer, state.get("extracted_issues"))
     print(f"재생성된 답변 : {new_answer.answer}")
     # answer_history는 operator.add reducer가 자동으로 이어붙이므로 새 답변만 반환
     return {"answer": new_answer, "answer_retry_count": current_retry + 1, "answer_history": [new_answer]}

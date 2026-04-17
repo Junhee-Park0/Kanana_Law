@@ -32,7 +32,7 @@ def get_kanana_pipeline():
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
             device_map = "auto",
-            torch_dtype = torch.float32
+            torch_dtype = torch.float16
         )
         print(f"   ✓ 로컬 모델 로드 완료 ({time.time() - model_start:.1f}초)")
         
@@ -71,7 +71,7 @@ def get_kanana_pipeline():
 
     return _pipeline, _tokenizer
 
-def call_kanana(system_prompt: str, user_input: dict, max_new_tokens: int = 512) -> str:
+def call_kanana(system_prompt: str, user_input: dict, max_new_tokens: int = Config.KANANA_MAX_NEW_TOKENS) -> str:
     """
     Kanana 모델을 직접 호출하는 함수
     """
@@ -208,7 +208,7 @@ def _repair_common_json_issues(raw_text: str) -> str:
     return repaired
 
 
-def call_kanana_structured(system_prompt: str, user_input: dict, output_schema: type, max_new_tokens: int = 512) -> Any:
+def call_kanana_structured(system_prompt: str, user_input: dict, output_schema: type, max_new_tokens: int = Config.KANANA_MAX_NEW_TOKENS) -> Any:
     """
     Kanana 모델의 output 형태를 한정(JSON)하여 호출하는 함수
     """
